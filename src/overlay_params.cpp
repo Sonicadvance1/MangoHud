@@ -29,6 +29,7 @@
 #include "blacklist.h"
 #include "mesa/util/os_socket.h"
 #include "file_utils.h"
+#include "fex.h"
 
 #if defined(HAVE_X11) || defined(HAVE_WAYLAND)
 #include <xkbcommon/xkbcommon.h>
@@ -416,6 +417,15 @@ parse_fps_metrics(const char *str){
    fpsmetrics = std::make_unique<fpsMetrics>(metrics);
 
    return metrics;
+}
+
+static overlay_params::fex_stats_options
+parse_fex_stats(const char *str) {
+   return {
+#ifdef HAVE_FEX
+      .enabled = fex::is_fex_capable(),
+#endif
+   };
 }
 
 #define parse_width(s) parse_unsigned(s)

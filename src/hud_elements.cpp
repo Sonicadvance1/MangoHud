@@ -25,6 +25,7 @@
 #endif
 #include "amdgpu.h"
 #include "fps_metrics.h"
+#include "fex.h"
 
 #define CHAR_CELSIUS    "\xe2\x84\x83"
 #define CHAR_FAHRENHEIT "\xe2\x84\x89"
@@ -1518,6 +1519,97 @@ void HudElements::_display_session() {
     ImGui::PopFont();
 }
 
+void HudElements::fex_stats()
+{
+#ifdef HAVE_FEX
+    if (!HUDElements.params->fex_stats.enabled) {
+        return;
+    }
+
+    ImGui::PushFont(HUDElements.sw_stats->font1);
+    ImguiNextColumnFirstItem();
+    HUDElements.TextColored(HUDElements.colors.ram, "%s", "FEX");
+    ImguiNextColumnOrNewRow();
+    ImGui::Dummy(ImVec2(0.0f, real_font_size.y));
+    ImguiNextColumnOrNewRow();
+    right_aligned_text(HUDElements.colors.text, HUDElements.ralign_width, "%s", fex::fex_status);
+    if (!fex::is_fex_pid_found()) {
+        ImGui::PopFont();
+        return;
+    }
+
+    ImguiNextColumnFirstItem();
+    HUDElements.TextColored(HUDElements.colors.ram, "%s", "Type");
+    ImguiNextColumnOrNewRow();
+    ImGui::Dummy(ImVec2(0.0f, real_font_size.y));
+    ImguiNextColumnOrNewRow();
+    right_aligned_text(HUDElements.colors.text, HUDElements.ralign_width, "%s", fex::get_fex_app_type());
+
+    ImguiNextColumnFirstItem();
+    HUDElements.TextColored(HUDElements.colors.ram, "%s", "FEX sigbus events");
+    ImguiNextColumnOrNewRow();
+    ImGui::Dummy(ImVec2(0.0f, real_font_size.y));
+    ImguiNextColumnOrNewRow();
+    right_aligned_text(HUDElements.colors.text, HUDElements.ralign_width, "%d - %d max/10s", fex::sigbus_counts.Count(), fex::sigbus_counts.Max());
+
+    ImguiNextColumnFirstItem();
+    HUDElements.TextColored(HUDElements.colors.ram, "%s", "FEX SMC events");
+    ImguiNextColumnOrNewRow();
+    ImGui::Dummy(ImVec2(0.0f, real_font_size.y));
+    ImguiNextColumnOrNewRow();
+    right_aligned_text(HUDElements.colors.text, HUDElements.ralign_width, "%d - %d max/10s", fex::smc_counts.Count(), fex::smc_counts.Max());
+
+    ImGui::PopFont();
+
+    // Draw hot threads
+
+    bool Warning = false;
+    ImVec4 WarningColor;
+    ImguiNextColumnFirstItem();
+    ImGui::Dummy(ImVec2(0.0f, real_font_size.y));
+
+    ImGui::PushFont(HUDElements.sw_stats->font1);
+
+    for (auto it : fex::fex_max_thread_loads){
+        if (it >= 75.0) {
+            Warning = true;
+            WarningColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+        }
+        else if (it >= 50.0) {
+            Warning = true;
+            WarningColor = ImVec4(1.0f, 1.0f, 0.0f, 1.0f);
+        }
+    }
+
+    HUDElements.TextColored(HUDElements.colors.engine, "%s", "FEX JIT top loaded threads");
+
+    ImGui::PopFont();
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    if (Warning) {
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, WarningColor);
+    }
+
+    ImGui::PlotHistogram("", fex::fex_max_thread_loads.data(),
+        fex::fex_max_thread_loads.size(), 0,
+        NULL, 0, 100,
+        ImVec2(ImGui::GetWindowContentRegionWidth(), 50));
+    ImGui::PopStyleColor(1 + (Warning ? 1 : 0));
+
+
+    ImGui::PushFont(HUDElements.sw_stats->font1);
+    HUDElements.TextColored(HUDElements.colors.engine, "%s", "FEX JIT Load");
+    ImGui::PopFont();
+
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+
+    ImGui::PlotLines("", fex::fex_load_data.data(),
+        fex::fex_load_data.size(), 0,
+        NULL, 0, 100,
+        ImVec2(ImGui::GetWindowContentRegionWidth(), 50));
+    ImGui::PopStyleColor(1);
+#endif //HAVE_FEX
+}
+
 void HudElements::sort_elements(const std::pair<std::string, std::string>& option) {
     const auto& param = option.first;
     const auto& value = option.second;
@@ -1566,8 +1658,8 @@ void HudElements::sort_elements(const std::pair<std::string, std::string>& optio
         {"winesync", {winesync}},
         {"present_mode", {present_mode}},
         {"network", {network}},
-        {"display_session", {_display_session}}
-
+        {"display_session", {_display_session}},
+        {"fex_stats", {fex_stats}}
     };
 
     auto check_param = display_params.find(param);
